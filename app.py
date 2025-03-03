@@ -5,9 +5,15 @@ from flask import Flask, request, jsonify, render_template
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from werkzeug.utils import secure_filename
 
-# Load the trained model
+# Lazy model loading to prevent excessive memory usage
 MODEL_PATH = "pesticide_recommendation_model.h5"
-model = tf.keras.models.load_model(MODEL_PATH)
+model = None  # Model will be loaded only when needed
+
+def get_model():
+    global model
+    if model is None:
+        model = tf.keras.models.load_model(MODEL_PATH)
+    return model
 
 # Class labels and pesticide mapping
 class_labels = [
@@ -46,10 +52,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Function to preprocess the image
 def preprocess_image(image_path):
-    img = load_img(image_path, target_size=(224, 224))
+    img = load_img(image_path, target_size=(224, 224))  # Keep input size small
     img_array = img_to_array(img) / 255.0  # Normalize
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
+    return np.expand_dims(img_array, axis=0)
 
 @app.route('/')
 def home():
@@ -70,6 +75,7 @@ def predict():
     
     # Preprocess image and make prediction
     img_array = preprocess_image(file_path)
+    model = get_model()  # Load model only when needed
     predictions = model.predict(img_array)
     predicted_class = class_labels[np.argmax(predictions)]
     
