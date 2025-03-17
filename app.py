@@ -8,14 +8,14 @@ from flask_cors import CORS
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Force CPU usage (for Render compatibility)
+# Force CPU usage (for compatibility on some cloud platforms)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests
+CORS(app)  # Enable CORS for cross-origin requests
 
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
