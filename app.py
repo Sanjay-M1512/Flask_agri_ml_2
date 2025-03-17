@@ -15,7 +15,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
 
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
@@ -47,17 +47,10 @@ def allowed_file(filename):
 
 # Class labels and pesticide recommendations
 class_labels = [
-    "Pepper__bell___Bacterial_spot",
-    "Potato___Early_blight",
-    "Potato___Late_blight",
-    "Tomato_Target_Spot",
-    "Tomato_Tomato_mosaic_virus",
-    "Tomato_Tomato_YellowLeaf_Curl",
-    "Tomato_Bacterial_spot",
-    "Tomato_Early_blight",
-    "Tomato_Leaf_Mold",
-    "Tomato_Septoria_leaf_spot",
-    "Tomato_Spider_mites_Two_spotted",
+    "Pepper__bell___Bacterial_spot", "Potato___Early_blight", "Potato___Late_blight",
+    "Tomato_Target_Spot", "Tomato_Tomato_mosaic_virus", "Tomato_Tomato_YellowLeaf_Curl",
+    "Tomato_Bacterial_spot", "Tomato_Early_blight", "Tomato_Leaf_Mold",
+    "Tomato_Septoria_leaf_spot", "Tomato_Spider_mites_Two_spotted"
 ]
 
 pesticide_mapping = {
