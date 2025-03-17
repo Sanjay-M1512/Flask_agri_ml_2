@@ -51,9 +51,6 @@ def preprocess_image(image_path):
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
-@app.route('/')
-def home():
-    return render_template('index.html')
 
 @app.route('/pest', methods=['POST'])
 def predict():
