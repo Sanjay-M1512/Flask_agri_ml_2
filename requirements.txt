@@ -1,6 +1,11 @@
 flask
-tensorflow
+flask-cors
+tensorflow-cpu
 numpy
 pillow
 werkzeug
-gunicorn
+gunicorn==21.2.0
+requests
+pandas
+scikit-learn
+flask-restful
