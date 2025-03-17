@@ -4,7 +4,7 @@ tensorflow
 numpy
 pillow
 werkzeug
-gunicorn
+gunicorn==21.2.0
 requests
 pandas
 scikit-learn
