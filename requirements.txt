@@ -1,15 +1,6 @@
 flask
-flask-cors
-flask-restful
-tensorflow-cpu
+tensorflow
 numpy
 pillow
 werkzeug
-gunicorn==21.2.0
-requests
-pandas
-scikit-learn
-protobuf
-opencv-python
-setuptools
-matplotlib
+gunicorn
