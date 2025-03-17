@@ -1,24 +1,29 @@
 import os
 import numpy as np
 import tensorflow as tf
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from werkzeug.utils import secure_filename
-from flask_cors import CORS  # Allows cross-origin requests
+from flask_cors import CORS
+
+# Disable GPU to avoid TensorFlow errors in server environments
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
+# Upload folder setup
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# Model path and lazy loading
 MODEL_PATH = "pesticide_recommendation_model.h5"
-model = None  # Lazy model loading
+model = None
 
 def get_model():
-    """Loads model into memory only when required."""
+    """Load the model into memory if it's not already loaded."""
     global model
     if model is None:
         try:
@@ -33,10 +38,10 @@ def get_model():
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
 def allowed_file(filename):
-    """Check if the uploaded file is an image."""
+    """Check if the uploaded file is an allowed image format."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Class labels and pesticide mapping
+# Class labels and pesticide recommendations
 class_labels = [
     "Pepper__bell___Bacterial_spot",
     "Potato___Early_blight",
@@ -75,12 +80,9 @@ def preprocess_image(image_path):
         print(f"❌ Error processing image: {e}")
         return None
 
-
-
 @app.route('/pest', methods=['POST'])
 def predict():
     try:
-        # Check if file is in request
         if 'file' not in request.files:
             return jsonify({"error": "No file uploaded"}), 400
 
@@ -88,7 +90,6 @@ def predict():
         if file.filename == '':
             return jsonify({"error": "No selected file"}), 400
 
-        # Validate file type
         if not allowed_file(file.filename):
             return jsonify({"error": "Invalid file format. Only PNG, JPG, and JPEG allowed"}), 400
 
@@ -117,6 +118,9 @@ def predict():
         print(f"🌾 Disease detected: {predicted_class}")
         print(f"🧴 Pesticide recommended: {pesticide}")
 
+        # Remove uploaded image after prediction (optional)
+        os.remove(file_path)
+
         return jsonify({
             "disease": predicted_class,
             "pesticide_recommendation": pesticide
@@ -130,4 +134,4 @@ def predict():
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
