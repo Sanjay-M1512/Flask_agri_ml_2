@@ -6,9 +6,10 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import logging
+import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Force CPU usage (for compatibility on some cloud platforms)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -20,7 +21,7 @@ CORS(app)  # Enable CORS for cross-origin requests
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Model lazy loading
 MODEL_PATH = "pesticide_recommendation_model.h5"
@@ -77,34 +78,42 @@ def preprocess_image(image_path):
         logging.error(f"❌ Error processing image: {e}")
         return None
 
-@app.route('/pest', methods=['POST'])
+@app.route("/pest", methods=["POST"])
 def predict():
     """Handle image upload and return JSON prediction."""
     try:
-        if 'file' not in request.files:
+        # Check if a file is in the request
+        if "file" not in request.files:
+            logging.error("🚫 No file uploaded")
             return jsonify({"error": "No file uploaded"}), 400
 
-        file = request.files['file']
-        if file.filename == '':
+        file = request.files["file"]
+
+        # Check if the filename is valid
+        if file.filename == "":
+            logging.error("🚫 No file selected")
             return jsonify({"error": "No selected file"}), 400
 
         if not allowed_file(file.filename):
+            logging.error("🚫 Invalid file format")
             return jsonify({"error": "Invalid file format. Only PNG, JPG, and JPEG allowed"}), 400
 
-        # Save uploaded file
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # Save uploaded file with timestamp to prevent overwriting
+        filename = secure_filename(f"{int(time.time())}_{file.filename}")
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
         logging.info(f"📥 File received: {filename}")
 
         # Preprocess image
         img_array = preprocess_image(file_path)
         if img_array is None:
+            os.remove(file_path)  # Clean up
             return jsonify({"error": "Failed to process image"}), 500
 
         # Load model and make prediction
         model = get_model()
         if model is None:
+            os.remove(file_path)  # Clean up
             return jsonify({"error": "Model loading failed"}), 500
 
         predictions = model.predict(img_array)
@@ -128,5 +137,5 @@ def predict():
         logging.error(f"❌ Unexpected error: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
