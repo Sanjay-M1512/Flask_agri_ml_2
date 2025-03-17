@@ -7,27 +7,27 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import logging
 
-# Configure logging for debugging
+# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Force CPU usage (Render compatibility)
+# Force CPU usage (for Render compatibility)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
+CORS(app)  # Allow cross-origin requests
 
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Model path and lazy loading
+# Model lazy loading
 MODEL_PATH = "pesticide_recommendation_model.h5"
 model = None
 
 def get_model():
-    """Load the model into memory if it's not already loaded."""
+    """Lazy load the model into memory."""
     global model
     if model is None:
         try:
@@ -38,11 +38,11 @@ def get_model():
             return None
     return model
 
-# Allowed image file extensions
+# Allowed file extensions
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
 def allowed_file(filename):
-    """Check if the uploaded file is an allowed image format."""
+    """Check if file is a valid image format."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Class labels and pesticide recommendations
@@ -68,17 +68,18 @@ pesticide_mapping = {
 }
 
 def preprocess_image(image_path):
-    """Loads and preprocesses the image for model input."""
+    """Load and preprocess image for MobileNetV2."""
     try:
         img = load_img(image_path, target_size=(224, 224))  # Resize for MobileNetV2
         img_array = img_to_array(img) / 255.0  # Normalize pixel values
-        return np.expand_dims(img_array.astype(np.float32), axis=0)  # Ensure float type
+        return np.expand_dims(img_array.astype(np.float32), axis=0)  # Convert to float32
     except Exception as e:
         logging.error(f"❌ Error processing image: {e}")
         return None
 
 @app.route('/pest', methods=['POST'])
 def predict():
+    """Handle image upload and return JSON prediction."""
     try:
         if 'file' not in request.files:
             return jsonify({"error": "No file uploaded"}), 400
@@ -121,11 +122,8 @@ def predict():
         return jsonify({
             "disease": predicted_class,
             "pesticide_recommendation": pesticide
-        })
+        }), 200
 
-    except ValueError as ve:
-        logging.error(f"❌ ValueError: {ve}")
-        return jsonify({"error": "Invalid input format"}), 400
     except Exception as e:
         logging.error(f"❌ Unexpected error: {e}")
         return jsonify({"error": "Internal server error"}), 500
