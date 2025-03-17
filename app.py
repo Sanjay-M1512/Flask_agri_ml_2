@@ -5,8 +5,12 @@ from flask import Flask, request, jsonify
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
+import logging
 
-# Disable GPU to avoid TensorFlow errors in server environments
+# Configure logging for debugging
+logging.basicConfig(level=logging.DEBUG)
+
+# Force CPU usage (Render compatibility)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
@@ -28,9 +32,9 @@ def get_model():
     if model is None:
         try:
             model = tf.keras.models.load_model(MODEL_PATH)
-            print("✅ Model loaded successfully!")
+            logging.info("✅ Model loaded successfully!")
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
+            logging.error(f"❌ Error loading model: {e}")
             return None
     return model
 
@@ -77,7 +81,7 @@ def preprocess_image(image_path):
         img_array = img_to_array(img) / 255.0  # Normalize pixel values
         return np.expand_dims(img_array.astype(np.float32), axis=0)  # Ensure float type
     except Exception as e:
-        print(f"❌ Error processing image: {e}")
+        logging.error(f"❌ Error processing image: {e}")
         return None
 
 @app.route('/pest', methods=['POST'])
@@ -97,7 +101,7 @@ def predict():
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        print(f"📥 File received: {filename}")
+        logging.info(f"📥 File received: {filename}")
 
         # Preprocess image
         img_array = preprocess_image(file_path)
@@ -115,10 +119,10 @@ def predict():
         # Get pesticide recommendation
         pesticide = pesticide_mapping.get(predicted_class, "No recommendation available")
 
-        print(f"🌾 Disease detected: {predicted_class}")
-        print(f"🧴 Pesticide recommended: {pesticide}")
+        logging.info(f"🌾 Disease detected: {predicted_class}")
+        logging.info(f"🧴 Pesticide recommended: {pesticide}")
 
-        # Remove uploaded image after prediction (optional)
+        # Remove uploaded image after prediction (cleanup)
         os.remove(file_path)
 
         return jsonify({
@@ -127,10 +131,10 @@ def predict():
         })
 
     except ValueError as ve:
-        print(f"❌ ValueError: {ve}")
+        logging.error(f"❌ ValueError: {ve}")
         return jsonify({"error": "Invalid input format"}), 400
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        logging.error(f"❌ Unexpected error: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
