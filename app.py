@@ -7,10 +7,10 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 import logging
 
-# Configure logging for debugging
+# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Force CPU usage (Render compatibility)
+# Force CPU usage (for Render compatibility)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
@@ -20,30 +20,13 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Model path and lazy loading
+# Model path
 MODEL_PATH = "pesticide_recommendation_model.h5"
-model = None
 
-def get_model():
-    """Load the model into memory if it's not already loaded."""
-    global model
-    if model is None:
-        try:
-            model = tf.keras.models.load_model(MODEL_PATH)
-            logging.info("✅ Model loaded successfully!")
-        except Exception as e:
-            logging.error(f"❌ Error loading model: {e}")
-            return None
-    return model
-
-# Allowed image file extensions
+# Allowed image formats
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
-
-def allowed_file(filename):
-    """Check if the uploaded file is an allowed image format."""
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Class labels and pesticide recommendations
 class_labels = [
@@ -67,32 +50,53 @@ pesticide_mapping = {
     "Tomato_Spider_mites_Two_spotted": "Abamectin, Spinosad",
 }
 
+# Global model variable
+model = None
+
+def allowed_file(filename):
+    """Check if the uploaded file has a valid extension."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def preprocess_image(image_path):
-    """Loads and preprocesses the image for model input."""
+    """Preprocess image for model prediction."""
     try:
         img = load_img(image_path, target_size=(224, 224))  # Resize for MobileNetV2
         img_array = img_to_array(img) / 255.0  # Normalize pixel values
-        return np.expand_dims(img_array.astype(np.float32), axis=0)  # Ensure float type
+        return np.expand_dims(img_array.astype(np.float32), axis=0)  # Add batch dimension
     except Exception as e:
         logging.error(f"❌ Error processing image: {e}")
         return None
 
-@app.route('/pest', methods=['POST'])
+def load_model():
+    """Load model into memory if not already loaded."""
+    global model
+    if model is None:
+        try:
+            logging.info("🔄 Loading model...")
+            model = tf.keras.models.load_model(MODEL_PATH)
+            logging.info("✅ Model loaded successfully!")
+        except Exception as e:
+            logging.error(f"❌ Model loading failed: {e}")
+            model = None
+    return model
+
+@app.route("/pest", methods=["POST"])
 def predict():
+    """Handle pesticide recommendation prediction."""
     try:
-        if 'file' not in request.files:
+        if "file" not in request.files:
             return jsonify({"error": "No file uploaded"}), 400
 
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No file selected"}), 400
 
         if not allowed_file(file.filename):
             return jsonify({"error": "Invalid file format. Only PNG, JPG, and JPEG allowed"}), 400
 
         # Save uploaded file
         filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
         logging.info(f"📥 File received: {filename}")
 
@@ -101,8 +105,8 @@ def predict():
         if img_array is None:
             return jsonify({"error": "Failed to process image"}), 500
 
-        # Load model and make prediction
-        model = get_model()
+        # Load model and predict
+        model = load_model()
         if model is None:
             return jsonify({"error": "Model loading failed"}), 500
 
@@ -112,10 +116,10 @@ def predict():
         # Get pesticide recommendation
         pesticide = pesticide_mapping.get(predicted_class, "No recommendation available")
 
-        logging.info(f"🌾 Disease detected: {predicted_class}")
+        logging.info(f"🌿 Disease detected: {predicted_class}")
         logging.info(f"🧴 Pesticide recommended: {pesticide}")
 
-        # Remove uploaded image after prediction (cleanup)
+        # Remove uploaded file after processing
         os.remove(file_path)
 
         return jsonify({
@@ -130,5 +134,6 @@ def predict():
         logging.error(f"❌ Unexpected error: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    load_model()  # Load the model on startup
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
