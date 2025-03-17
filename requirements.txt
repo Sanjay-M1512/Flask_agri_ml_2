@@ -1,6 +1,11 @@
 flask
+flask-cors
 tensorflow
 numpy
 pillow
 werkzeug
 gunicorn
+requests
+pandas
+scikit-learn
+flask-restful
