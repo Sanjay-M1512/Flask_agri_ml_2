@@ -10,12 +10,12 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Force CPU usage (for Render compatibility)
+# Force CPU usage
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Upload folder setup
 UPLOAD_FOLDER = "uploads"
@@ -50,8 +50,14 @@ pesticide_mapping = {
     "Tomato_Spider_mites_Two_spotted": "Abamectin, Spinosad",
 }
 
-# Global model variable
-model = None
+# Load model once at startup
+try:
+    logging.info("🔄 Loading model...")
+    model = tf.keras.models.load_model(MODEL_PATH)
+    logging.info("✅ Model loaded successfully!")
+except Exception as e:
+    logging.error(f"❌ Model loading failed: {e}")
+    model = None
 
 def allowed_file(filename):
     """Check if the uploaded file has a valid extension."""
@@ -66,19 +72,6 @@ def preprocess_image(image_path):
     except Exception as e:
         logging.error(f"❌ Error processing image: {e}")
         return None
-
-def load_model():
-    """Load model into memory if not already loaded."""
-    global model
-    if model is None:
-        try:
-            logging.info("🔄 Loading model...")
-            model = tf.keras.models.load_model(MODEL_PATH)
-            logging.info("✅ Model loaded successfully!")
-        except Exception as e:
-            logging.error(f"❌ Model loading failed: {e}")
-            model = None
-    return model
 
 @app.route("/pest", methods=["POST"])
 def predict():
@@ -105,11 +98,11 @@ def predict():
         if img_array is None:
             return jsonify({"error": "Failed to process image"}), 500
 
-        # Load model and predict
-        model = load_model()
+        # Ensure model is loaded
         if model is None:
-            return jsonify({"error": "Model loading failed"}), 500
+            return jsonify({"error": "Model not available"}), 500
 
+        # Make prediction
         predictions = model.predict(img_array)
         predicted_class = class_labels[np.argmax(predictions)]
 
@@ -127,13 +120,9 @@ def predict():
             "pesticide_recommendation": pesticide
         })
 
-    except ValueError as ve:
-        logging.error(f"❌ ValueError: {ve}")
-        return jsonify({"error": "Invalid input format"}), 400
     except Exception as e:
         logging.error(f"❌ Unexpected error: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    load_model()  # Load the model on startup
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)), debug=True)
